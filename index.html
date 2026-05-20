@@ -1,89 +1,872 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Slide Presentation</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: #f5f5f5;
-            text-align: center;
-        }
-        .slide {
-            display: none;
-            padding: 40px;
-            background: white;
-            margin: 20px auto;
-            max-width: 800px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            border-radius: 10px;
-        }
-        .slide.active {
-            display: block;
-        }
-        .controls {
-            margin-top: 20px;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            margin: 0 5px;
-            cursor: pointer;
-        }
-        #slideCounter {
-            font-size: 14px;
-            color: #555;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1a1d22" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Zelda</title>
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>🐕</text></svg>" />
+  <style>
+    :root {
+      --bg: #14171c;
+      --surface: #1c2026;
+      --surface-2: #242a32;
+      --line: #2e353e;
+      --text: #e8ebf0;
+      --muted: #8b94a3;
+      --accent: #ffb84d;
+      --accent-dim: #4a3a1f;
+      --meal: #ffb84d;
+      --walk: #6cc4ff;
+      --note: #b69bff;
+      --danger: #ff6b6b;
+      --ok: #5dd4a0;
+      --warn: #ffd166;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 16px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    body { padding-bottom: env(safe-area-inset-bottom); }
+    button, input, textarea, select { font: inherit; color: inherit; }
+    button { background: none; border: none; cursor: pointer; padding: 0; }
+    a { color: var(--accent); }
+
+    /* Layout */
+    .app { max-width: 560px; margin: 0 auto; min-height: 100vh; padding: 0 16px 120px;
+      padding-top: env(safe-area-inset-top); }
+    header.top {
+      position: sticky; top: 0; z-index: 5; background: var(--bg);
+      padding: 14px 0 10px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+    }
+    header.top h1 { margin: 0; font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    header.top .who { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    header.top .who button { color: var(--accent); font-size: 13px; }
+
+    /* Now / next */
+    .now-card {
+      margin-top: 14px; padding: 16px; background: var(--surface); border-radius: 14px;
+      border: 1px solid var(--line);
+    }
+    .now-time { font-size: 13px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; }
+    .next-row { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+    .next-row .icon { font-size: 28px; }
+    .next-row .info { flex: 1; min-width: 0; }
+    .next-row .label { font-weight: 600; font-size: 17px; }
+    .next-row .sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .next-row .log-btn {
+      background: var(--accent); color: #1a1d22; font-weight: 700;
+      padding: 10px 14px; border-radius: 10px; font-size: 14px;
+    }
+    .next-row .log-btn:active { transform: scale(0.97); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 6px; }
+    .pill.overdue { background: rgba(255,107,107,0.18); color: var(--danger); }
+    .pill.soon { background: rgba(255,209,102,0.18); color: var(--warn); }
+    .pill.done { background: rgba(93,212,160,0.18); color: var(--ok); }
+
+    /* Quick log bar */
+    .quick {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0 8px;
+    }
+    .quick button {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+      padding: 14px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+      font-weight: 600;
+    }
+    .quick button .em { font-size: 24px; }
+    .quick button.meal:active { background: var(--accent-dim); }
+    .quick button.walk { color: var(--walk); }
+    .quick button.note { color: var(--note); }
+
+    /* Schedule */
+    .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+      color: var(--muted); margin: 20px 4px 8px; font-weight: 600; }
+
+    .schedule { display: flex; flex-direction: column; gap: 8px; }
+    .sched-item {
+      display: flex; align-items: center; gap: 12px; padding: 12px;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    }
+    .sched-item.overdue { border-color: rgba(255,107,107,0.6); }
+    .sched-item.next { border-color: var(--accent); background: linear-gradient(180deg, rgba(255,184,77,0.08), var(--surface)); }
+    .sched-item.done { opacity: 0.55; }
+    .sched-time { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 64px; }
+    .sched-time small { display: block; font-size: 10px; color: var(--muted); font-weight: 500; text-transform: uppercase; }
+    .sched-icon { font-size: 22px; }
+    .sched-body { flex: 1; min-width: 0; }
+    .sched-body .lbl { font-weight: 600; }
+    .sched-body .nt { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .sched-quick {
+      background: var(--surface-2); color: var(--text); padding: 8px 10px;
+      border-radius: 8px; font-size: 13px; font-weight: 600;
+    }
+
+    /* Log feed */
+    .feed { display: flex; flex-direction: column; gap: 10px; }
+    .entry {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+      padding: 12px; display: flex; gap: 12px;
+    }
+    .entry .left { font-size: 28px; line-height: 1; flex-shrink: 0; }
+    .entry .body { flex: 1; min-width: 0; }
+    .entry .top-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .entry .ttl { font-weight: 600; }
+    .entry .when { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .entry .meta { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .entry .tags { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .entry .tag { background: var(--surface-2); padding: 3px 8px; border-radius: 6px; font-size: 12px; }
+    .entry .tag.poop { background: rgba(180,120,80,0.25); color: #d3a07a; }
+    .entry .tag.pee { background: rgba(108,196,255,0.18); color: var(--walk); }
+    .entry .photo {
+      margin-top: 8px; border-radius: 10px; overflow: hidden; max-height: 220px;
+      background: #000;
+    }
+    .entry .photo img { width: 100%; display: block; max-height: 220px; object-fit: cover; }
+    .entry .who-tag { font-size: 11px; color: var(--muted); margin-top: 6px; }
+    .entry .who-tag .del { color: var(--danger); margin-left: 10px; }
+
+    .empty { color: var(--muted); padding: 18px; text-align: center; font-size: 14px;
+      border: 1px dashed var(--line); border-radius: 12px; }
+
+    /* History tabs */
+    .day-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0 12px; }
+    .day-tabs::-webkit-scrollbar { display: none; }
+    .day-tab {
+      flex-shrink: 0; padding: 8px 14px; background: var(--surface); border: 1px solid var(--line);
+      border-radius: 999px; font-size: 13px; color: var(--muted); font-weight: 600;
+    }
+    .day-tab.active { background: var(--accent); color: #1a1d22; border-color: var(--accent); }
+
+    /* Modal */
+    .modal-bg {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50;
+      display: flex; align-items: flex-end; justify-content: center;
+      animation: fade 0.18s ease;
+    }
+    @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+    .modal {
+      background: var(--surface); width: 100%; max-width: 560px;
+      border-radius: 18px 18px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+      animation: slideup 0.22s ease;
+      max-height: 92vh; overflow-y: auto;
+    }
+    @keyframes slideup { from { transform: translateY(20px); } to { transform: translateY(0); } }
+    .modal h2 { margin: 0 0 14px; font-size: 18px; display: flex; align-items: center; gap: 8px; }
+    .modal h2 .close { margin-left: auto; color: var(--muted); font-size: 22px; line-height: 1; padding: 4px 8px; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px;
+      text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+    .field input[type=text], .field input[type=number], .field textarea, .field input[type=datetime-local] {
+      width: 100%; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+      padding: 12px; color: var(--text); outline: none;
+    }
+    .field textarea { min-height: 70px; resize: vertical; }
+    .field input:focus, .field textarea:focus { border-color: var(--accent); }
+    .toggle-row { display: flex; gap: 8px; }
+    .toggle-row button {
+      flex: 1; padding: 12px; background: var(--surface-2); border: 1px solid var(--line);
+      border-radius: 10px; font-weight: 600;
+    }
+    .toggle-row button.on { background: var(--accent); color: #1a1d22; border-color: var(--accent); }
+    .check-row { display: flex; gap: 10px; }
+    .check-row button {
+      flex: 1; padding: 14px 10px; background: var(--surface-2); border: 1px solid var(--line);
+      border-radius: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;
+      font-size: 16px;
+    }
+    .check-row button.on { background: rgba(93,212,160,0.18); color: var(--ok); border-color: var(--ok); }
+    .photo-input {
+      display: flex; gap: 10px; align-items: center;
+    }
+    .photo-input label.btn {
+      padding: 12px; background: var(--surface-2); border: 1px solid var(--line);
+      border-radius: 10px; font-weight: 600; flex: 1; text-align: center; cursor: pointer;
+    }
+    .photo-input input { display: none; }
+    .photo-input .preview { width: 64px; height: 64px; border-radius: 10px; background: #000; flex-shrink: 0;
+      background-size: cover; background-position: center; }
+    .photo-input .preview.empty { background: var(--surface-2); display: flex; align-items: center;
+      justify-content: center; color: var(--muted); font-size: 24px; }
+    .submit-btn {
+      width: 100%; padding: 16px; background: var(--accent); color: #1a1d22;
+      border-radius: 12px; font-weight: 700; font-size: 16px; margin-top: 6px;
+    }
+    .submit-btn:disabled { opacity: 0.6; }
+    .submit-btn.walk { background: var(--walk); }
+    .submit-btn.note { background: var(--note); color: #fff; }
+
+    /* Gate */
+    .gate { min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 24px; text-align: center; }
+    .gate .logo { font-size: 64px; margin-bottom: 8px; }
+    .gate h1 { margin: 0 0 6px; font-size: 26px; }
+    .gate p { color: var(--muted); margin: 0 0 24px; }
+    .gate input { width: 100%; max-width: 280px; padding: 14px; background: var(--surface);
+      border: 1px solid var(--line); border-radius: 12px; color: var(--text); font-size: 18px;
+      text-align: center; outline: none; }
+    .gate input:focus { border-color: var(--accent); }
+    .gate button {
+      margin-top: 12px; padding: 14px 30px; background: var(--accent); color: #1a1d22;
+      border-radius: 12px; font-weight: 700; font-size: 16px;
+    }
+    .gate .err { color: var(--danger); margin-top: 10px; min-height: 22px; font-size: 14px; }
+    .gate .who-pick { display: flex; gap: 10px; margin-top: 16px; }
+    .gate .who-pick button {
+      padding: 14px 22px; background: var(--surface); border: 1px solid var(--line);
+      color: var(--text); border-radius: 12px; font-weight: 600;
+    }
+    .gate .who-pick button.on { background: var(--accent); color: #1a1d22; border-color: var(--accent); }
+
+    /* Photo viewer */
+    .viewer {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 100;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .viewer img { max-width: 100%; max-height: 100%; }
+    .viewer .x { position: absolute; top: env(safe-area-inset-top, 20px); right: 20px;
+      color: #fff; font-size: 30px; background: rgba(0,0,0,0.4); border-radius: 999px;
+      width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+
+    .toast {
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+      background: var(--ok); color: #0a1814; padding: 10px 18px; border-radius: 999px;
+      font-weight: 600; z-index: 200; box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+      animation: pop 0.22s ease;
+    }
+    .toast.err { background: var(--danger); color: #fff; }
+    @keyframes pop { from { transform: translate(-50%, 20px); opacity: 0; }
+                     to { transform: translate(-50%, 0); opacity: 1; } }
+
+    .switcher { display: flex; gap: 6px; margin: 6px 0 14px; }
+    .switcher button { flex: 1; padding: 8px; background: var(--surface); border: 1px solid var(--line);
+      color: var(--muted); border-radius: 10px; font-size: 13px; font-weight: 600; }
+    .switcher button.on { background: var(--surface-2); color: var(--text); }
+  </style>
 </head>
 <body>
 
-    <div class="slide active">Slide 1 content goes here</div>
-    <div class="slide">Slide 2 content goes here</div>
-    <div class="slide">Slide 3 content goes here</div>
-
-    <div class="controls">
-        <button id="prevBtn">Previous</button>
-        <button id="nextBtn">Next</button>
-        <p id="slideCounter"></p>
+<!-- Gate screen -->
+<div id="gate" class="gate" style="display:none">
+  <div class="logo">🐕</div>
+  <h1>Zelda</h1>
+  <p id="gatePrompt">Enter passcode</p>
+  <input id="gateInput" type="password" inputmode="text" autocapitalize="none" autocomplete="off" placeholder="passcode" />
+  <button id="gateBtn">Enter</button>
+  <div id="gateErr" class="err"></div>
+  <div id="whoPick" style="display:none">
+    <p style="margin-top:30px">Who are you?</p>
+    <div class="who-pick">
+      <button data-who="Shaun">Shaun</button>
+      <button data-who="Adi">Adi</button>
     </div>
+  </div>
+</div>
 
-    <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const slides = document.querySelectorAll('.slide');
-        let currentSlide = 0;
-        const prevBtn = document.getElementById('prevBtn');
-        const nextBtn = document.getElementById('nextBtn');
-        const counter = document.getElementById('slideCounter');
+<!-- Main app -->
+<div id="app" class="app" style="display:none">
+  <header class="top">
+    <h1>🐕 Zelda</h1>
+    <div class="who">
+      <span id="meName"></span>
+      <button id="switchWho">switch</button>
+    </div>
+  </header>
 
-        function showSlide(index) {
-            slides.forEach((slide, i) => {
-                slide.classList.toggle('active', i === index);
-            });
-            counter.textContent = `${index + 1} / ${slides.length}`;
-            prevBtn.disabled = index === 0;
-            nextBtn.disabled = index === slides.length - 1;
-        }
+  <!-- NEXT UP -->
+  <div class="now-card">
+    <div class="now-time" id="nowTime"></div>
+    <div id="nextSlot"></div>
+  </div>
 
-        prevBtn.addEventListener('click', () => {
-            if (currentSlide > 0) {
-                currentSlide--;
-                showSlide(currentSlide);
-            }
-        });
+  <!-- QUICK LOG -->
+  <div class="quick">
+    <button class="meal" data-open="meal"><span class="em">🍖</span><span>Meal</span></button>
+    <button class="walk" data-open="walk"><span class="em">🚶</span><span>Walk</span></button>
+    <button class="note" data-open="note"><span class="em">📝</span><span>Note</span></button>
+  </div>
 
-        nextBtn.addEventListener('click', () => {
-            if (currentSlide < slides.length - 1) {
-                currentSlide++;
-                showSlide(currentSlide);
-            }
-        });
+  <!-- Day switcher -->
+  <div class="switcher">
+    <button id="tabToday" class="on">Today's schedule</button>
+    <button id="tabLog">Activity log</button>
+  </div>
 
-        showSlide(currentSlide);
+  <!-- Schedule view -->
+  <div id="scheduleView">
+    <div class="section-title">Schedule (6am – 6am)</div>
+    <div id="scheduleList" class="schedule"></div>
+  </div>
+
+  <!-- Activity log view -->
+  <div id="logView" style="display:none">
+    <div class="day-tabs" id="dayTabs"></div>
+    <div class="feed" id="feedList"></div>
+  </div>
+</div>
+
+<div id="modalRoot"></div>
+<div id="viewerRoot"></div>
+<div id="toastRoot"></div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+
+// ---------- CONFIG ----------
+const SUPABASE_URL = 'https://fdgkuaiohddbvhfuluxr.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_2ZweDMv-Ga-JPWPLCm_pvQ_UdwQK0YD';
+const PASSCODE = 'zelda';   // change this string if you ever want to rotate
+
+// Zelda's daily schedule (24h). type: meal | walk
+const SCHEDULE = [
+  { time: '10:00', type: 'walk',  label: 'Morning walk',     note: 'Window 8am–12pm. Usually poops & pees.' },
+  { time: '11:00', type: 'meal',  label: 'Breakfast (full)', note: 'Chicken, carrot, rice' },
+  { time: '15:00', type: 'walk',  label: 'Afternoon walk',   note: 'Before office (Shaun)' },
+  { time: '18:00', type: 'meal',  label: 'Dinner (full)',    note: 'Chicken, carrot, rice' },
+  { time: '23:00', type: 'walk',  label: 'Night walk' },
+  { time: '00:00', type: 'meal',  label: 'Late snack (light)', note: 'Half-portion chicken + rice' },
+  { time: '02:30', type: 'walk',  label: 'Bedtime walk',     note: 'Before bed' },
+];
+
+// "Day" window: 6am to 6am next day
+const DAY_START_HOUR = 6;
+
+// ---------- SUPABASE ----------
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: false },
+  realtime: { params: { eventsPerSecond: 5 } }
+});
+
+// ---------- STATE ----------
+const state = {
+  who: localStorage.getItem('zelda.who') || null,
+  events: [],          // all loaded events
+  viewDayOffset: 0,    // 0 = today, -1 = yesterday, etc
+  tab: 'schedule',
+};
+
+// ---------- GATE ----------
+function showGate() {
+  const gate = document.getElementById('gate');
+  const app = document.getElementById('app');
+  gate.style.display = 'flex';
+  app.style.display = 'none';
+
+  const unlocked = localStorage.getItem('zelda.unlocked') === '1';
+  if (unlocked && !state.who) {
+    document.getElementById('gatePrompt').style.display = 'none';
+    document.getElementById('gateInput').style.display = 'none';
+    document.getElementById('gateBtn').style.display = 'none';
+    document.getElementById('whoPick').style.display = 'block';
+  }
+  if (unlocked && state.who) enterApp();
+}
+
+document.getElementById('gateBtn').addEventListener('click', tryUnlock);
+document.getElementById('gateInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') tryUnlock();
+});
+function tryUnlock() {
+  const v = document.getElementById('gateInput').value.trim().toLowerCase();
+  if (v === PASSCODE.toLowerCase()) {
+    localStorage.setItem('zelda.unlocked', '1');
+    document.getElementById('gateErr').textContent = '';
+    document.getElementById('gatePrompt').style.display = 'none';
+    document.getElementById('gateInput').style.display = 'none';
+    document.getElementById('gateBtn').style.display = 'none';
+    document.getElementById('whoPick').style.display = 'block';
+  } else {
+    document.getElementById('gateErr').textContent = 'Wrong passcode';
+  }
+}
+document.querySelectorAll('#whoPick button').forEach(b => {
+  b.addEventListener('click', () => {
+    state.who = b.dataset.who;
+    localStorage.setItem('zelda.who', state.who);
+    enterApp();
+  });
+});
+
+document.getElementById('switchWho').addEventListener('click', () => {
+  if (confirm('Switch caretaker?')) {
+    localStorage.removeItem('zelda.who');
+    state.who = null;
+    showGate();
+  }
+});
+
+function enterApp() {
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('meName').textContent = state.who;
+  loadEvents();
+  subscribeRealtime();
+  startClock();
+}
+
+// ---------- CLOCK / SCHEDULE LOGIC ----------
+function fmtTime(d) {
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+function fmtShort(d) {
+  const today = dayWindow(0);
+  const yest = dayWindow(-1);
+  if (d >= today.start && d < today.end) return fmtTime(d);
+  if (d >= yest.start && d < yest.end) return 'Yest ' + fmtTime(d);
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + fmtTime(d);
+}
+
+// 6am-to-6am window for a given offset (0 = current day window)
+function dayWindow(offset = 0) {
+  const now = new Date();
+  const start = new Date(now);
+  start.setHours(DAY_START_HOUR, 0, 0, 0);
+  if (now.getHours() < DAY_START_HOUR) start.setDate(start.getDate() - 1);
+  start.setDate(start.getDate() + offset);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { start, end };
+}
+
+function scheduleSlotsForWindow(win) {
+  // Build absolute Date for each schedule item within this day window
+  return SCHEDULE.map(s => {
+    const [hh, mm] = s.time.split(':').map(Number);
+    const d = new Date(win.start);
+    d.setHours(hh, mm, 0, 0);
+    if (d < win.start) d.setDate(d.getDate() + 1);
+    if (d >= win.end) d.setDate(d.getDate() - 1);
+    return { ...s, when: d };
+  }).sort((a, b) => a.when - b.when);
+}
+
+function findDoneFor(slot, eventsInWindow) {
+  // Match events of matching type within ±90 min of the slot
+  const WIN_MS = 90 * 60 * 1000;
+  return eventsInWindow.find(e =>
+    e.type === slot.type &&
+    Math.abs(new Date(e.occurred_at) - slot.when) <= WIN_MS
+  );
+}
+
+function renderNextSlot() {
+  const now = new Date();
+  document.getElementById('nowTime').textContent = 'Now · ' + fmtTime(now);
+
+  const win = dayWindow(0);
+  const inWin = state.events.filter(e => {
+    const t = new Date(e.occurred_at);
+    return t >= win.start && t < win.end;
+  });
+  const slots = scheduleSlotsForWindow(win);
+
+  // Find first undone slot
+  const upcoming = slots.filter(s => !findDoneFor(s, inWin));
+  let target = upcoming.find(s => s.when >= now) || upcoming[0];
+
+  const el = document.getElementById('nextSlot');
+  if (!target) {
+    el.innerHTML = `<div class="next-row"><div class="icon">✅</div><div class="info"><div class="label">All scheduled tasks done for today.</div><div class="sub">Nice work.</div></div></div>`;
+    return;
+  }
+  const diffMin = Math.round((target.when - now) / 60000);
+  let pill = '';
+  if (diffMin < -10) pill = `<span class="pill overdue">Overdue ${Math.abs(diffMin)}m</span>`;
+  else if (diffMin <= 30 && diffMin >= -10) pill = `<span class="pill soon">${diffMin <= 0 ? 'Now' : 'In ' + diffMin + 'm'}</span>`;
+  else pill = `<span class="pill">${fmtTime(target.when)}</span>`;
+  const icon = target.type === 'meal' ? '🍖' : '🚶';
+  el.innerHTML = `
+    <div class="next-row">
+      <div class="icon">${icon}</div>
+      <div class="info">
+        <div class="label">${pill}${target.label}</div>
+        <div class="sub">${target.note || ''}</div>
+      </div>
+      <button class="log-btn" id="logNextBtn">Log</button>
+    </div>`;
+  document.getElementById('logNextBtn').addEventListener('click', () => openModal(target.type, target));
+}
+
+function renderSchedule() {
+  const win = dayWindow(0);
+  const inWin = state.events.filter(e => {
+    const t = new Date(e.occurred_at);
+    return t >= win.start && t < win.end;
+  });
+  const slots = scheduleSlotsForWindow(win);
+  const now = new Date();
+  const list = document.getElementById('scheduleList');
+  list.innerHTML = '';
+  for (const s of slots) {
+    const done = findDoneFor(s, inWin);
+    const diffMin = Math.round((s.when - now) / 60000);
+    const isOverdue = !done && diffMin < -10;
+    const isNext = !done && diffMin >= -10 && diffMin <= 60;
+    const div = document.createElement('div');
+    div.className = 'sched-item' + (done ? ' done' : '') + (isOverdue ? ' overdue' : '') + (isNext ? ' next' : '');
+    const icon = s.type === 'meal' ? '🍖' : '🚶';
+    const status = done
+      ? `<span class="pill done">Done ${fmtTime(new Date(done.occurred_at))}</span>`
+      : isOverdue ? `<span class="pill overdue">${Math.abs(diffMin)}m late</span>`
+      : isNext ? `<span class="pill soon">${diffMin <= 0 ? 'Now' : 'in ' + diffMin + 'm'}</span>`
+      : '';
+    div.innerHTML = `
+      <div class="sched-time">${s.time}<small>${s.type}</small></div>
+      <div class="sched-icon">${icon}</div>
+      <div class="sched-body">
+        <div class="lbl">${status}${s.label}</div>
+        ${s.note ? `<div class="nt">${s.note}</div>` : ''}
+      </div>
+      ${done ? '' : `<button class="sched-quick">Log</button>`}
+    `;
+    if (!done) {
+      div.querySelector('.sched-quick').addEventListener('click', () => openModal(s.type, s));
+    }
+    list.appendChild(div);
+  }
+}
+
+function startClock() {
+  renderNextSlot();
+  renderSchedule();
+  setInterval(() => { renderNextSlot(); renderSchedule(); }, 30000);
+}
+
+// ---------- LOAD & RENDER LOG ----------
+async function loadEvents() {
+  // Load last 8 days
+  const since = new Date();
+  since.setDate(since.getDate() - 8);
+  const { data, error } = await sb.from('events').select('*').gte('occurred_at', since.toISOString()).order('occurred_at', { ascending: false });
+  if (error) { toast('Load failed: ' + error.message, true); return; }
+  state.events = data || [];
+  renderAll();
+}
+
+function subscribeRealtime() {
+  sb.channel('events-feed')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, payload => {
+      if (payload.eventType === 'INSERT') {
+        state.events.unshift(payload.new);
+      } else if (payload.eventType === 'DELETE') {
+        state.events = state.events.filter(e => e.id !== payload.old.id);
+      } else if (payload.eventType === 'UPDATE') {
+        const i = state.events.findIndex(e => e.id === payload.new.id);
+        if (i >= 0) state.events[i] = payload.new;
+      }
+      state.events.sort((a, b) => new Date(b.occurred_at) - new Date(a.occurred_at));
+      renderAll();
+    })
+    .subscribe();
+}
+
+function renderAll() {
+  renderNextSlot();
+  renderSchedule();
+  renderDayTabs();
+  renderFeed();
+}
+
+function renderDayTabs() {
+  const tabs = document.getElementById('dayTabs');
+  tabs.innerHTML = '';
+  for (let off = 0; off >= -7; off--) {
+    const win = dayWindow(off);
+    const label = off === 0 ? 'Today' : off === -1 ? 'Yesterday'
+      : win.start.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+    const b = document.createElement('button');
+    b.className = 'day-tab' + (off === state.viewDayOffset ? ' active' : '');
+    b.textContent = label;
+    b.addEventListener('click', () => { state.viewDayOffset = off; renderDayTabs(); renderFeed(); });
+    tabs.appendChild(b);
+  }
+}
+
+function renderFeed() {
+  const win = dayWindow(state.viewDayOffset);
+  const items = state.events.filter(e => {
+    const t = new Date(e.occurred_at);
+    return t >= win.start && t < win.end;
+  });
+  const list = document.getElementById('feedList');
+  list.innerHTML = '';
+  if (!items.length) {
+    list.innerHTML = '<div class="empty">No entries logged for this day.</div>';
+    return;
+  }
+  for (const e of items) {
+    list.appendChild(renderEntry(e));
+  }
+}
+
+function publicPhotoUrl(path) {
+  if (!path) return null;
+  return sb.storage.from('pet-photos').getPublicUrl(path).data.publicUrl;
+}
+
+function renderEntry(e) {
+  const div = document.createElement('div');
+  div.className = 'entry';
+  const icon = e.type === 'meal' ? '🍖' : e.type === 'walk' ? '🚶' : '📝';
+  const ttl = e.type === 'meal'
+      ? (e.meal_kind === 'light' ? 'Light meal' : 'Meal')
+    : e.type === 'walk' ? 'Walk' : 'Note';
+  let meta = '';
+  if (e.type === 'meal') {
+    meta = e.meal_food || '';
+  } else if (e.type === 'walk') {
+    meta = (e.walk_minutes ? `${e.walk_minutes} min` : '');
+  }
+  let tags = '';
+  if (e.type === 'walk') {
+    if (e.poop) tags += '<span class="tag poop">💩 poop</span>';
+    if (e.pee) tags += '<span class="tag pee">💧 pee</span>';
+    if (!e.poop && !e.pee) tags += '<span class="tag">no poop/pee</span>';
+  }
+  const photoUrl = publicPhotoUrl(e.photo_path);
+  div.innerHTML = `
+    <div class="left">${icon}</div>
+    <div class="body">
+      <div class="top-row">
+        <div class="ttl">${ttl}</div>
+        <div class="when">${fmtShort(new Date(e.occurred_at))}</div>
+      </div>
+      ${meta ? `<div class="meta">${meta}</div>` : ''}
+      ${tags ? `<div class="tags">${tags}</div>` : ''}
+      ${e.notes ? `<div class="meta">"${escapeHtml(e.notes)}"</div>` : ''}
+      ${photoUrl ? `<div class="photo"><img src="${photoUrl}" alt="" loading="lazy" /></div>` : ''}
+      <div class="who-tag">by ${e.caretaker || 'unknown'} · <button class="del" data-id="${e.id}" data-photo="${e.photo_path || ''}">delete</button></div>
+    </div>`;
+  const img = div.querySelector('.photo img');
+  if (img) img.addEventListener('click', () => openViewer(photoUrl));
+  div.querySelector('.del').addEventListener('click', () => deleteEntry(e.id, e.photo_path));
+  return div;
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+async function deleteEntry(id, photoPath) {
+  if (!confirm('Delete this entry?')) return;
+  if (photoPath) {
+    await sb.storage.from('pet-photos').remove([photoPath]);
+  }
+  const { error } = await sb.from('events').delete().eq('id', id);
+  if (error) toast('Delete failed: ' + error.message, true);
+  else toast('Deleted');
+}
+
+// ---------- TABS ----------
+document.getElementById('tabToday').addEventListener('click', () => {
+  state.tab = 'schedule';
+  document.getElementById('tabToday').classList.add('on');
+  document.getElementById('tabLog').classList.remove('on');
+  document.getElementById('scheduleView').style.display = 'block';
+  document.getElementById('logView').style.display = 'none';
+});
+document.getElementById('tabLog').addEventListener('click', () => {
+  state.tab = 'log';
+  document.getElementById('tabLog').classList.add('on');
+  document.getElementById('tabToday').classList.remove('on');
+  document.getElementById('scheduleView').style.display = 'none';
+  document.getElementById('logView').style.display = 'block';
+  renderFeed();
+});
+
+document.querySelectorAll('.quick button').forEach(b => {
+  b.addEventListener('click', () => openModal(b.dataset.open));
+});
+
+// ---------- MODAL ----------
+function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
+
+function openModal(type, slot = null) {
+  const root = document.getElementById('modalRoot');
+  const nowLocal = toLocalInputValue(new Date());
+  let inner = '';
+  const title = type === 'meal' ? '🍖 Log a meal'
+              : type === 'walk' ? '🚶 Log a walk'
+              : '📝 Add a note';
+
+  if (type === 'meal') {
+    const isLight = slot && /light/i.test(slot.label || '');
+    const defaultFood = isLight ? 'Chicken + rice (half)' : 'Chicken, carrot, rice';
+    inner = `
+      <div class="field">
+        <label>Meal size</label>
+        <div class="toggle-row" id="mealKindRow">
+          <button data-v="full" class="${isLight ? '' : 'on'}">Full meal</button>
+          <button data-v="light" class="${isLight ? 'on' : ''}">Light / half</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>What did she eat?</label>
+        <input id="mealFood" type="text" value="${defaultFood}" />
+      </div>
+    `;
+  } else if (type === 'walk') {
+    inner = `
+      <div class="field">
+        <label>Did she do business?</label>
+        <div class="check-row" id="walkCheckRow">
+          <button data-k="poop">💩 Poop</button>
+          <button data-k="pee">💧 Pee</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Walk length (minutes)</label>
+        <input id="walkMin" type="number" inputmode="numeric" min="1" max="180" placeholder="e.g. 20" />
+      </div>
+    `;
+  }
+
+  root.innerHTML = `
+    <div class="modal-bg" id="modalBg">
+      <div class="modal" onclick="event.stopPropagation()">
+        <h2>${title}<button class="close" id="modalClose">&times;</button></h2>
+        ${inner}
+        <div class="field">
+          <label>Notes (optional)</label>
+          <textarea id="notes" placeholder="Anything to mention…"></textarea>
+        </div>
+        <div class="field">
+          <label>Photo (optional)</label>
+          <div class="photo-input">
+            <div class="preview empty" id="photoPreview">📷</div>
+            <label class="btn">Take / choose photo
+              <input id="photoFile" type="file" accept="image/*" capture="environment" />
+            </label>
+          </div>
+        </div>
+        <div class="field">
+          <label>When did this happen?</label>
+          <input id="occurredAt" type="datetime-local" value="${nowLocal}" />
+        </div>
+        <button class="submit-btn ${type}" id="submitBtn">Save</button>
+      </div>
+    </div>`;
+
+  document.getElementById('modalBg').addEventListener('click', closeModal);
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+
+  // Toggles
+  if (type === 'meal') {
+    document.querySelectorAll('#mealKindRow button').forEach(b => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('#mealKindRow button').forEach(x => x.classList.remove('on'));
+        b.classList.add('on');
+      });
     });
-    </script>
+  }
+  if (type === 'walk') {
+    document.querySelectorAll('#walkCheckRow button').forEach(b => {
+      b.addEventListener('click', () => b.classList.toggle('on'));
+    });
+  }
+
+  // Photo preview
+  const fileInput = document.getElementById('photoFile');
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files[0];
+    if (!f) return;
+    const url = URL.createObjectURL(f);
+    const p = document.getElementById('photoPreview');
+    p.classList.remove('empty');
+    p.textContent = '';
+    p.style.backgroundImage = `url("${url}")`;
+  });
+
+  document.getElementById('submitBtn').addEventListener('click', () => submitEntry(type));
+}
+
+function toLocalInputValue(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+async function submitEntry(type) {
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  const notes = document.getElementById('notes').value.trim() || null;
+  const occurredAtRaw = document.getElementById('occurredAt').value;
+  const occurred_at = occurredAtRaw ? new Date(occurredAtRaw).toISOString() : new Date().toISOString();
+
+  const row = {
+    type,
+    caretaker: state.who,
+    occurred_at,
+    notes,
+  };
+
+  if (type === 'meal') {
+    const kindBtn = document.querySelector('#mealKindRow button.on');
+    row.meal_kind = kindBtn ? kindBtn.dataset.v : 'full';
+    row.meal_food = document.getElementById('mealFood').value.trim() || null;
+  } else if (type === 'walk') {
+    row.poop = !!document.querySelector('#walkCheckRow button[data-k="poop"].on');
+    row.pee = !!document.querySelector('#walkCheckRow button[data-k="pee"].on');
+    const m = parseInt(document.getElementById('walkMin').value, 10);
+    if (m > 0) row.walk_minutes = m;
+  }
+
+  // Photo upload first
+  const file = document.getElementById('photoFile').files[0];
+  if (file) {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const path = `${new Date().toISOString().slice(0,10)}/${crypto.randomUUID()}.${ext}`;
+    const up = await sb.storage.from('pet-photos').upload(path, file, {
+      contentType: file.type || 'image/jpeg',
+      cacheControl: '3600',
+    });
+    if (up.error) {
+      toast('Photo upload failed: ' + up.error.message, true);
+      btn.disabled = false; btn.textContent = 'Save';
+      return;
+    }
+    row.photo_path = path;
+  }
+
+  const { error } = await sb.from('events').insert(row);
+  if (error) {
+    toast('Save failed: ' + error.message, true);
+    btn.disabled = false; btn.textContent = 'Save';
+    return;
+  }
+  toast('Logged ✓');
+  closeModal();
+}
+
+// ---------- PHOTO VIEWER ----------
+function openViewer(url) {
+  const root = document.getElementById('viewerRoot');
+  root.innerHTML = `<div class="viewer" id="viewerBg">
+    <button class="x" id="viewerClose">&times;</button>
+    <img src="${url}" />
+  </div>`;
+  document.getElementById('viewerBg').addEventListener('click', closeViewer);
+  document.getElementById('viewerClose').addEventListener('click', closeViewer);
+}
+function closeViewer() { document.getElementById('viewerRoot').innerHTML = ''; }
+
+// ---------- TOAST ----------
+function toast(msg, isErr = false) {
+  const root = document.getElementById('toastRoot');
+  const div = document.createElement('div');
+  div.className = 'toast' + (isErr ? ' err' : '');
+  div.textContent = msg;
+  root.appendChild(div);
+  setTimeout(() => div.remove(), 2400);
+}
+
+// ---------- BOOT ----------
+showGate();
+</script>
+
 </body>
 </html>
