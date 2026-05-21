@@ -443,13 +443,31 @@ function scheduleSlotsForWindow(win) {
   }).sort((a, b) => a.when - b.when);
 }
 
-function findDoneFor(slot, eventsInWindow) {
-  // Match events of matching type within ±90 min of the slot
-  const WIN_MS = 90 * 60 * 1000;
-  return eventsInWindow.find(e =>
-    e.type === slot.type &&
-    Math.abs(new Date(e.occurred_at) - slot.when) <= WIN_MS
-  );
+// For each slot, the "done" event is the matching-type event for which this
+// slot is the closest one of its type. No fixed time window — if you fed her
+// breakfast at 1pm, it still counts as breakfast (the closest meal slot).
+function buildSlotDone(slots, eventsInWindow) {
+  const sameTypeSlots = { meal: [], walk: [] };
+  for (const s of slots) {
+    if (sameTypeSlots[s.type]) sameTypeSlots[s.type].push(s);
+  }
+  const map = new Map();
+  for (const e of eventsInWindow) {
+    const candidates = sameTypeSlots[e.type];
+    if (!candidates || candidates.length === 0) continue;
+    const et = new Date(e.occurred_at);
+    let nearest = candidates[0];
+    let nearestDiff = Math.abs(et - nearest.when);
+    for (let i = 1; i < candidates.length; i++) {
+      const d = Math.abs(et - candidates[i].when);
+      if (d < nearestDiff) { nearestDiff = d; nearest = candidates[i]; }
+    }
+    const prev = map.get(nearest);
+    if (!prev || Math.abs(new Date(prev.occurred_at) - nearest.when) > nearestDiff) {
+      map.set(nearest, e);
+    }
+  }
+  return map;
 }
 
 function renderNextSlot() {
@@ -462,9 +480,10 @@ function renderNextSlot() {
     return t >= win.start && t < win.end;
   });
   const slots = scheduleSlotsForWindow(win);
+  const doneMap = buildSlotDone(slots, inWin);
 
   // Find first undone slot
-  const upcoming = slots.filter(s => !findDoneFor(s, inWin));
+  const upcoming = slots.filter(s => !doneMap.get(s));
   let target = upcoming.find(s => s.when >= now) || upcoming[0];
 
   const el = document.getElementById('nextSlot');
@@ -497,11 +516,12 @@ function renderSchedule() {
     return t >= win.start && t < win.end;
   });
   const slots = scheduleSlotsForWindow(win);
+  const doneMap = buildSlotDone(slots, inWin);
   const now = new Date();
   const list = document.getElementById('scheduleList');
   list.innerHTML = '';
   for (const s of slots) {
-    const done = findDoneFor(s, inWin);
+    const done = doneMap.get(s);
     const diffMin = Math.round((s.when - now) / 60000);
     const isOverdue = !done && diffMin < -10;
     const isNext = !done && diffMin >= -10 && diffMin <= 60;
