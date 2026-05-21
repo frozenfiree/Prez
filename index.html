@@ -231,6 +231,42 @@
       color: #fff; font-size: 30px; background: rgba(0,0,0,0.4); border-radius: 999px;
       width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
 
+    /* Recommendations from AMG */
+    #recsBanner { margin: 14px 0 0; display: flex; flex-direction: column; gap: 8px; }
+    .rec-card {
+      background: linear-gradient(135deg, rgba(182,155,255,0.18), rgba(182,155,255,0.06));
+      border: 1px solid rgba(182,155,255,0.5); border-radius: 14px; padding: 12px 14px;
+      display: flex; gap: 10px; align-items: flex-start;
+    }
+    .rec-card .em { font-size: 22px; flex-shrink: 0; line-height: 1; }
+    .rec-card .body { flex: 1; min-width: 0; }
+    .rec-card .who { font-size: 11px; color: var(--note); text-transform: uppercase;
+      letter-spacing: 0.5px; font-weight: 700; }
+    .rec-card .txt { margin-top: 4px; font-size: 14px; white-space: pre-wrap; word-wrap: break-word; }
+    .rec-card .photo { margin-top: 8px; border-radius: 10px; overflow: hidden; max-height: 200px; }
+    .rec-card .photo img { width: 100%; display: block; max-height: 200px; object-fit: cover; }
+    .rec-card .ack { background: var(--note); color: #fff; padding: 6px 10px; border-radius: 8px;
+      font-size: 12px; font-weight: 600; margin-top: 8px; align-self: flex-start; }
+    .rec-card .ack:active { transform: scale(0.96); }
+    .rec-card .when { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    .rec-cta {
+      width: 100%; margin: 16px 0 8px; padding: 14px; background: var(--note); color: #fff;
+      border-radius: 14px; font-weight: 700; font-size: 15px;
+    }
+    .rec-cta:active { transform: scale(0.98); }
+
+    .who-pick button.amg {
+      background: linear-gradient(135deg, rgba(182,155,255,0.3), rgba(182,155,255,0.1));
+      border-color: var(--note); color: var(--text);
+    }
+    .who-pick button.amg.on { background: var(--note); color: #fff; border-color: var(--note); }
+
+    header.top .role-badge {
+      font-size: 10px; background: var(--note); color: #fff; padding: 2px 6px;
+      border-radius: 6px; margin-right: 6px; font-weight: 700; letter-spacing: 0.5px;
+    }
+
     .toast {
       position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
       background: var(--ok); color: #0a1814; padding: 10px 18px; border-radius: 999px;
@@ -262,7 +298,9 @@
     <div class="who-pick">
       <button data-who="Shaun">Shaun</button>
       <button data-who="Adi">Adi</button>
+      <button data-who="AMG" class="amg">AMG 👁</button>
     </div>
+    <p style="color:var(--muted);font-size:12px;margin-top:14px;max-width:280px">AMG is a viewer — sees all activity, can leave recommendations for the next caretaker.</p>
   </div>
 </div>
 
@@ -282,11 +320,19 @@
     <div id="nextSlot"></div>
   </div>
 
+  <!-- Pinned recommendations from AMG -->
+  <div id="recsBanner"></div>
+
   <!-- QUICK LOG -->
-  <div class="quick">
+  <div class="quick" id="quickBar">
     <button class="meal" data-open="meal"><span class="em">🍖</span><span>Meal</span></button>
     <button class="walk" data-open="walk"><span class="em">🚶</span><span>Walk</span></button>
     <button class="note" data-open="note"><span class="em">📝</span><span>Note</span></button>
+  </div>
+
+  <!-- AMG-only action -->
+  <div id="recBar" style="display:none">
+    <button id="addRecBtn" class="rec-cta">💡 Leave a recommendation for the next caretaker</button>
   </div>
 
   <!-- Day switcher -->
@@ -398,10 +444,22 @@ document.getElementById('switchWho').addEventListener('click', () => {
   }
 });
 
+function isViewer() { return state.who === 'AMG'; }
+
+function applyRoleUI() {
+  const viewer = isViewer();
+  document.getElementById('quickBar').style.display = viewer ? 'none' : 'grid';
+  document.getElementById('recBar').style.display = viewer ? 'block' : 'none';
+  const me = document.getElementById('meName');
+  me.innerHTML = viewer
+    ? `<span class="role-badge">VIEWER</span>${state.who}`
+    : state.who;
+}
+
 function enterApp() {
   document.getElementById('gate').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-  document.getElementById('meName').textContent = state.who;
+  applyRoleUI();
   loadEvents();
   subscribeRealtime();
   startClock();
@@ -584,10 +642,49 @@ function subscribeRealtime() {
 }
 
 function renderAll() {
+  renderRecsBanner();
   renderNextSlot();
   renderSchedule();
   renderDayTabs();
   renderFeed();
+}
+
+function renderRecsBanner() {
+  const banner = document.getElementById('recsBanner');
+  banner.innerHTML = '';
+  // Show pending (un-acknowledged) recommendations to everyone;
+  // caretakers can mark them read, AMG sees them but can't acknowledge.
+  const pending = state.events
+    .filter(e => e.type === 'rec' && !e.acknowledged_at)
+    .sort((a, b) => new Date(b.occurred_at) - new Date(a.occurred_at));
+  for (const r of pending) {
+    const photoUrl = publicPhotoUrl(r.photo_path);
+    const card = document.createElement('div');
+    card.className = 'rec-card';
+    card.innerHTML = `
+      <div class="em">💡</div>
+      <div class="body">
+        <div class="who">${escapeHtml(r.caretaker || 'AMG')} says</div>
+        <div class="txt">${escapeHtml(r.notes || '')}</div>
+        ${photoUrl ? `<div class="photo"><img src="${photoUrl}" alt="" loading="lazy" /></div>` : ''}
+        <div class="when">${fmtShort(new Date(r.occurred_at))}</div>
+        ${isViewer() ? '' : `<button class="ack" data-id="${r.id}">Mark as read</button>`}
+      </div>`;
+    const img = card.querySelector('.photo img');
+    if (img) img.addEventListener('click', () => openViewer(photoUrl));
+    const ackBtn = card.querySelector('.ack');
+    if (ackBtn) ackBtn.addEventListener('click', () => acknowledgeRec(r.id));
+    banner.appendChild(card);
+  }
+}
+
+async function acknowledgeRec(id) {
+  const { error } = await sb.from('events').update({
+    acknowledged_at: new Date().toISOString(),
+    acknowledged_by: state.who,
+  }).eq('id', id);
+  if (error) toast('Could not mark read: ' + error.message, true);
+  else toast('Marked as read ✓');
 }
 
 function renderDayTabs() {
@@ -609,7 +706,10 @@ function renderFeed() {
   const win = dayWindow(state.viewDayOffset);
   const items = state.events.filter(e => {
     const t = new Date(e.occurred_at);
-    return t >= win.start && t < win.end;
+    if (t < win.start || t >= win.end) return false;
+    // Hide unacknowledged recommendations from the feed — they live in the pinned banner.
+    if (e.type === 'rec' && !e.acknowledged_at) return false;
+    return true;
   });
   const list = document.getElementById('feedList');
   list.innerHTML = '';
@@ -630,10 +730,15 @@ function publicPhotoUrl(path) {
 function renderEntry(e) {
   const div = document.createElement('div');
   div.className = 'entry';
-  const icon = e.type === 'meal' ? '🍖' : e.type === 'walk' ? '🚶' : '📝';
+  const icon = e.type === 'meal' ? '🍖'
+             : e.type === 'walk' ? '🚶'
+             : e.type === 'rec'  ? '💡'
+             : '📝';
   const ttl = e.type === 'meal'
       ? (e.meal_kind === 'light' ? 'Light meal' : 'Meal')
-    : e.type === 'walk' ? 'Walk' : 'Note';
+    : e.type === 'walk' ? 'Walk'
+    : e.type === 'rec'  ? 'Recommendation'
+    : 'Note';
   let meta = '';
   if (e.type === 'meal') {
     meta = e.meal_food || '';
@@ -646,7 +751,12 @@ function renderEntry(e) {
     if (e.pee) tags += '<span class="tag pee">💧 pee</span>';
     if (!e.poop && !e.pee) tags += '<span class="tag">no poop/pee</span>';
   }
+  if (e.type === 'rec' && e.acknowledged_at) {
+    tags += `<span class="tag">read by ${escapeHtml(e.acknowledged_by || '')}</span>`;
+  }
   const photoUrl = publicPhotoUrl(e.photo_path);
+  // AMG can only delete their own entries
+  const canDelete = !isViewer() || (e.caretaker === state.who);
   div.innerHTML = `
     <div class="left">${icon}</div>
     <div class="body">
@@ -658,11 +768,12 @@ function renderEntry(e) {
       ${tags ? `<div class="tags">${tags}</div>` : ''}
       ${e.notes ? `<div class="meta">"${escapeHtml(e.notes)}"</div>` : ''}
       ${photoUrl ? `<div class="photo"><img src="${photoUrl}" alt="" loading="lazy" /></div>` : ''}
-      <div class="who-tag">by ${e.caretaker || 'unknown'} · <button class="del" data-id="${e.id}" data-photo="${e.photo_path || ''}">delete</button></div>
+      <div class="who-tag">by ${e.caretaker || 'unknown'}${canDelete ? ` · <button class="del" data-id="${e.id}" data-photo="${e.photo_path || ''}">delete</button>` : ''}</div>
     </div>`;
   const img = div.querySelector('.photo img');
   if (img) img.addEventListener('click', () => openViewer(photoUrl));
-  div.querySelector('.del').addEventListener('click', () => deleteEntry(e.id, e.photo_path));
+  const delBtn = div.querySelector('.del');
+  if (delBtn) delBtn.addEventListener('click', () => deleteEntry(e.id, e.photo_path));
   return div;
 }
 
@@ -700,6 +811,7 @@ document.getElementById('tabLog').addEventListener('click', () => {
 document.querySelectorAll('.quick button').forEach(b => {
   b.addEventListener('click', () => openModal(b.dataset.open));
 });
+document.getElementById('addRecBtn').addEventListener('click', () => openModal('rec'));
 
 // ---------- MODAL ----------
 function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
@@ -710,7 +822,13 @@ function openModal(type, slot = null) {
   let inner = '';
   const title = type === 'meal' ? '🍖 Log a meal'
               : type === 'walk' ? '🚶 Log a walk'
+              : type === 'rec'  ? '💡 Leave a recommendation'
               : '📝 Add a note';
+  const notesPlaceholder = type === 'rec'
+    ? 'e.g. she seemed off today, try a shorter walk; bath is overdue; vet appt Friday…'
+    : 'Anything to mention…';
+  const showTime = type !== 'rec';
+  const submitLabel = type === 'rec' ? 'Post recommendation' : 'Save';
 
   if (type === 'meal') {
     const isLight = slot && /light/i.test(slot.label || '');
@@ -750,8 +868,8 @@ function openModal(type, slot = null) {
         <h2>${title}<button class="close" id="modalClose">&times;</button></h2>
         ${inner}
         <div class="field">
-          <label>Notes (optional)</label>
-          <textarea id="notes" placeholder="Anything to mention…"></textarea>
+          <label>${type === 'rec' ? 'Recommendation' : 'Notes (optional)'}</label>
+          <textarea id="notes" placeholder="${notesPlaceholder}"></textarea>
         </div>
         <div class="field">
           <label>Photo (optional)</label>
@@ -762,11 +880,11 @@ function openModal(type, slot = null) {
             </label>
           </div>
         </div>
-        <div class="field">
+        ${showTime ? `<div class="field">
           <label>When did this happen?</label>
           <input id="occurredAt" type="datetime-local" value="${nowLocal}" />
-        </div>
-        <button class="submit-btn ${type}" id="submitBtn">Save</button>
+        </div>` : ''}
+        <button class="submit-btn ${type}" id="submitBtn">${submitLabel}</button>
       </div>
     </div>`;
 
@@ -810,11 +928,18 @@ function toLocalInputValue(d) {
 
 async function submitEntry(type) {
   const btn = document.getElementById('submitBtn');
+  const originalLabel = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'Saving…';
 
   const notes = document.getElementById('notes').value.trim() || null;
-  const occurredAtRaw = document.getElementById('occurredAt').value;
+  if (type === 'rec' && !notes) {
+    toast('Write something first', true);
+    btn.disabled = false; btn.textContent = originalLabel;
+    return;
+  }
+  const occurredAtEl = document.getElementById('occurredAt');
+  const occurredAtRaw = occurredAtEl ? occurredAtEl.value : '';
   const occurred_at = occurredAtRaw ? new Date(occurredAtRaw).toISOString() : new Date().toISOString();
 
   const row = {
@@ -846,7 +971,7 @@ async function submitEntry(type) {
     });
     if (up.error) {
       toast('Photo upload failed: ' + up.error.message, true);
-      btn.disabled = false; btn.textContent = 'Save';
+      btn.disabled = false; btn.textContent = originalLabel;
       return;
     }
     row.photo_path = path;
@@ -855,10 +980,10 @@ async function submitEntry(type) {
   const { error } = await sb.from('events').insert(row);
   if (error) {
     toast('Save failed: ' + error.message, true);
-    btn.disabled = false; btn.textContent = 'Save';
+    btn.disabled = false; btn.textContent = originalLabel;
     return;
   }
-  toast('Logged ✓');
+  toast(type === 'rec' ? 'Posted for next caretaker ✓' : 'Logged ✓');
   closeModal();
 }
 
