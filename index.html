@@ -132,6 +132,17 @@
     .empty { color: var(--muted); padding: 18px; text-align: center; font-size: 14px;
       border: 1px dashed var(--line); border-radius: 12px; }
 
+    .earlier-toggle {
+      width: 100%; margin-top: 12px; padding: 12px 14px; background: var(--surface);
+      border: 1px solid var(--line); border-radius: 12px; color: var(--muted);
+      display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600;
+      text-align: left; cursor: pointer;
+    }
+    .earlier-toggle:active { background: var(--surface-2); }
+    .earlier-toggle .earlier-chev { font-size: 11px; width: 12px; flex-shrink: 0; }
+    .earlier-toggle .earlier-counts { margin-left: auto; font-size: 12px; color: var(--muted); }
+    .earlier-toggle.on { color: var(--text); }
+
     /* History tabs */
     .day-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0 12px; }
     .day-tabs::-webkit-scrollbar { display: none; }
@@ -343,7 +354,7 @@
 
   <!-- Schedule view -->
   <div id="scheduleView">
-    <div class="section-title">Schedule (6am – 6am)</div>
+    <div class="section-title">Upcoming today</div>
     <div id="scheduleList" class="schedule"></div>
   </div>
 
@@ -368,8 +379,8 @@ const PASSCODE = 'zelda';   // change this string if you ever want to rotate
 
 // Zelda's daily schedule (24h). type: meal | walk
 const SCHEDULE = [
-  { time: '10:00', type: 'walk',  label: 'Morning walk',     note: 'Window 8am–12pm. Usually poops & pees.' },
-  { time: '11:00', type: 'meal',  label: 'Breakfast (full)', note: 'Chicken, carrot, rice' },
+  { time: '09:00', type: 'walk',  label: 'Morning walk',     note: 'Window 8am–12pm. Usually poops & pees.' },
+  { time: '10:00', type: 'meal',  label: 'Breakfast (full)', note: 'Chicken, carrot, rice' },
   { time: '15:00', type: 'walk',  label: 'Afternoon walk',   note: 'Before office (Shaun)' },
   { time: '18:00', type: 'meal',  label: 'Dinner (full)',    note: 'Chicken, carrot, rice' },
   { time: '23:00', type: 'walk',  label: 'Night walk' },
@@ -392,6 +403,7 @@ const state = {
   events: [],          // all loaded events
   viewDayOffset: 0,    // 0 = today, -1 = yesterday, etc
   tab: 'schedule',
+  earlierExpanded: false,
 };
 
 // ---------- GATE ----------
@@ -578,7 +590,13 @@ function renderSchedule() {
   const now = new Date();
   const list = document.getElementById('scheduleList');
   list.innerHTML = '';
-  for (const s of slots) {
+
+  // Split: upcoming (slot.when >= now) goes on top in time order,
+  // earlier slots (done or overdue) collapse into a "Earlier today" section.
+  const upcoming = slots.filter(s => s.when >= now);
+  const earlier  = slots.filter(s => s.when <  now);
+
+  const buildSlotEl = (s) => {
     const done = doneMap.get(s);
     const diffMin = Math.round((s.when - now) / 60000);
     const isOverdue = !done && diffMin < -10;
@@ -590,7 +608,7 @@ function renderSchedule() {
       ? `<span class="pill done">Done ${fmtTime(new Date(done.occurred_at))}</span>`
       : isOverdue ? `<span class="pill overdue">${Math.abs(diffMin)}m late</span>`
       : isNext ? `<span class="pill soon">${diffMin <= 0 ? 'Now' : 'in ' + diffMin + 'm'}</span>`
-      : '';
+      : `<span class="pill">${fmtTime(s.when)}</span>`;
     div.innerHTML = `
       <div class="sched-time">${s.time}<small>${s.type}</small></div>
       <div class="sched-icon">${icon}</div>
@@ -598,12 +616,45 @@ function renderSchedule() {
         <div class="lbl">${status}${s.label}</div>
         ${s.note ? `<div class="nt">${s.note}</div>` : ''}
       </div>
-      ${done ? '' : `<button class="sched-quick">Log</button>`}
+      ${done || isViewer() ? '' : `<button class="sched-quick">Log</button>`}
     `;
-    if (!done) {
-      div.querySelector('.sched-quick').addEventListener('click', () => openModal(s.type, s));
+    const btn = div.querySelector('.sched-quick');
+    if (btn) btn.addEventListener('click', () => openModal(s.type, s));
+    return div;
+  };
+
+  // UPCOMING section
+  if (upcoming.length === 0 && earlier.length > 0) {
+    const allDone = earlier.every(s => doneMap.get(s));
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = allDone
+      ? 'All scheduled tasks done for today. Nice work.'
+      : 'No upcoming tasks left today.';
+    list.appendChild(empty);
+  }
+  for (const s of upcoming) list.appendChild(buildSlotEl(s));
+
+  // EARLIER section (collapsed by default)
+  if (earlier.length > 0) {
+    const doneCount = earlier.filter(s => doneMap.get(s)).length;
+    const missedCount = earlier.length - doneCount;
+    const expanded = state.earlierExpanded;
+    const header = document.createElement('button');
+    header.className = 'earlier-toggle' + (expanded ? ' on' : '');
+    header.innerHTML = `
+      <span class="earlier-chev">${expanded ? '▾' : '▸'}</span>
+      <span>Earlier today</span>
+      <span class="earlier-counts">${doneCount} done${missedCount ? ` · ${missedCount} missed` : ''}</span>
+    `;
+    header.addEventListener('click', () => {
+      state.earlierExpanded = !state.earlierExpanded;
+      renderSchedule();
+    });
+    list.appendChild(header);
+    if (expanded) {
+      for (const s of earlier) list.appendChild(buildSlotEl(s));
     }
-    list.appendChild(div);
   }
 }
 
